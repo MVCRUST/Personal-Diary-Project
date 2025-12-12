@@ -1,4 +1,4 @@
-const database = require('../database/connect');
+const database = require('../database/connection');
 
 class DiaryEntry {
 
@@ -11,7 +11,7 @@ class DiaryEntry {
 
     static async getAll() {
         const response = await database.query(
-            "SELECT * FROM diary_entries ORDER BY created DESC;"
+            "SELECT * FROM diary ORDER BY created DESC;"
         );
 
         if (response.rows.length === 0) {
@@ -24,7 +24,7 @@ class DiaryEntry {
 
     static async getOneById(id) {
         const response = await db.query(
-            "SELECT * FROM diary_entries WHERE diary_id = $1;",
+            "SELECT * FROM diary WHERE diary_id = $1;",
             [id]
         );
 
@@ -46,7 +46,7 @@ class DiaryEntry {
 
         if (created) {
             const response = await db.query(
-                `INSERT INTO diary_entries (created, title, content)
+                `INSERT INTO diary (created, title, content)
          VALUES ($1, $2, $3)
          RETURNING *;`,
                 [created, title, content]
@@ -70,7 +70,7 @@ class DiaryEntry {
         const newContent = data.content ?? this.content;
 
         const response = await db.query(
-            `UPDATE diary_entries
+            `UPDATE diary
        SET title = $1, content = $2
        WHERE diary_id = $3
        RETURNING *;`,
@@ -92,7 +92,7 @@ class DiaryEntry {
     // delete the entry 
       async destroy() {
     const response = await db.query(
-      "DELETE FROM diary_entries WHERE diary_id = $1 RETURNING *;",
+      "DELETE FROM diary WHERE diary_id = $1 RETURNING *;",
       [this.diary_id]
     );
 
