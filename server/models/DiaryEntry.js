@@ -1,4 +1,4 @@
-const database = require('../database/connection');
+const db = require('../database/connect');
 
 class DiaryEntry {
 
@@ -10,7 +10,7 @@ class DiaryEntry {
     }
 
     static async getAll() {
-        const response = await database.query(
+        const response = await db.query(
             "SELECT * FROM diary ORDER BY created DESC;"
         );
 
@@ -38,23 +38,14 @@ class DiaryEntry {
     // create a new entry 
 
     static async create(data) {
-        const { title, content, created } = data;
+        const { title, content } = data;
 
         if (!title || !content) {
             throw new Error("Title and content are required.");
-        }
-
-        if (created) {
-            const response = await db.query(
-                `INSERT INTO diary (created, title, content)
-         VALUES ($1, $2, $3)
-         RETURNING *;`,
-                [created, title, content]
-            );
-            return new DiaryEntry(response.rows[0]);
+        
         } else {
             const response = await db.query(
-                `INSERT INTO diary_entries (title, content)
+                `INSERT INTO diary (title, content)
          VALUES ($1, $2)
          RETURNING *;`,
                 [title, content]
