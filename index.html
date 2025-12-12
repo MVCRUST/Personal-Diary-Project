@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Diary</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <header class="topbar">
+    <h1>📒 My Diary</h1>
+    <p class="subtitle">A calm space for your thoughts</p>
+  </header>
+
+  <main class="container">
+    <!-- Create entry -->
+    <section class="card">
+      <h2>Create a new entry</h2>
+
+      <form id="createForm" class="form">
+        <div class="grid">
+          <label>
+            Title
+            <input id="title" type="text" required />
+          </label>
+
+          <label>
+            Date & time
+            <input id="created" type="datetime-local" />
+          </label>
+        </div>
+
+        <label>
+          Content
+          <textarea id="content" rows="5" required></textarea>
+        </label>
+
+        <button type="submit">Add entry</button>
+      </form>
+    </section>
+
+    <!-- Entries list -->
+    <section class="card">
+      <h2>Diary entries</h2>
+      <p class="muted">Newest entries appear at the bottom</p>
+
+      <div class="search-row">
+        <input id="searchInput" class="search" type="text" placeholder="Search by title or ID" />
+        <button id="searchBtn" class="secondary" type="button">Search</button>
+        <button id="clearBtn" class="ghost" type="button">Clear</button>
+      </div>
+
+      <!-- Search results cards (kept) -->
+      <div id="entries" class="entries"></div>
+
+      <!-- ✅ NEW: Table of ALL entries -->
+      <div class="table-wrap">
+        <h3 class="table-title">All diary entries</h3>
+
+        <table class="diary-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Created</th>
+              <th>Title</th>
+              <th class="actions-col">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="entriesTableBody">
+            <!-- rows inserted by JS -->
+          </tbody>
+        </table>
+
+        <p id="tableEmpty" class="muted" style="display:none;">No entries to show.</p>
+      </div>
+    </section>
+
+    <!-- Details / edit -->
+    <section id="detailsCard" class="card" style="display:none;">
+      <div class="row">
+        <h2>Entry details</h2>
+        <button id="closeBtn" class="ghost" type="button">Close</button>
+      </div>
+
+      <div id="details"></div>
+
+      <h3>Edit entry</h3>
+      <form id="editForm" class="form">
+        <label>
+          Title
+          <input id="editTitle" type="text" required />
+        </label>
+
+        <label>
+          Content
+          <textarea id="editContent" rows="5" required></textarea>
+        </label>
+
+        <div class="actions">
+          <button type="submit">Save changes</button>
+          <button id="deleteBtn" class="danger" type="button">Delete entry</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Hackathon #2 </p>
+  </footer>
+
+  <script>
+    const entriesDiv = document.getElementById("entries");
+    const detailsCard = document.getElementById("detailsCard");
+    const detailsDiv = document.getElementById("details");
+    const searchInput = document.getElementById("searchInput");
+
+    const tableBody = document.getElementById("entriesTableBody");
+    const tableEmpty = document.getElementById("tableEmpty");
+
+    let selectedId = null;
+
+    function formatDate(date) {
+      return new Date(date).toLocaleString();
+    }
+
+    // Fetch all entries once, then use the same data for cards + table
+    async function loadEntries() {
+      const res = await fetch("/diaryEntries");
+      const data = await res.json();
+
+      if (!Array.isArray(data)) {
+        entriesDiv.innerHTML = "<p class='muted'>No entries found</p>";
+        tableBody.innerHTML = "";
+        tableEmpty.style.display = "block";
+        return;
+      }
+
+      // newest at the bottom
+      const ordered = data.reverse();
+
+      // Show cards list (this can be search results or full list)
+      renderEntries(ordered);
+
+      // Always show ALL entries in the table
+      renderTable(ordered);
+    }
+
+    function renderEntries(entries) {
+      entriesDiv.innerHTML = "";
+
+      if (entries.length === 0) {
+        entriesDiv.innerHTML = "<p class='muted'>No entries yet</p>";
+        return;
+      }
+
+      entries.forEach(entry => {
+        const el = document.createElement("div");
+        el.className = "entry";
+
+        el.innerHTML = `
+          <div class="entry-head">
+            <div>
+              <h3>${entry.title}</h3>
+              <p class="muted">${formatDate(entry.created)}</p>
+            </div>
+            <button class="small" type="button">View</button>
+          </div>
+          <p>${entry.content.slice(0, 120)}${entry.content.length > 120 ? "…" : ""}</p>
+        `;
+
+        el.querySelector("button").onclick = () => openDetails(entry.diary_id);
+        entriesDiv.appendChild(el);
+      });
+    }
+
+    function renderTable(entries) {
+      tableBody.innerHTML = "";
+
+      if (entries.length === 0) {
+        tableEmpty.style.display = "block";
+        return;
+      }
+
+      tableEmpty.style.display = "none";
+
+      entries.forEach(entry => {
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+          <td>${entry.diary_id}</td>
+          <td>${formatDate(entry.created)}</td>
+          <td>${entry.title}</td>
+          <td class="actions-col">
+            <button class="small secondary" type="button" data-edit="${entry.diary_id}">Edit</button>
+            <button class="small danger" type="button" data-delete="${entry.diary_id}">Delete</button>
+          </td>
+        `;
+
+        // Edit opens the details/edit section
+        tr.querySelector(`[data-edit="${entry.diary_id}"]`).onclick = () => openDetails(entry.diary_id);
+
+        // Delete deletes immediately
+        tr.querySelector(`[data-delete="${entry.diary_id}"]`).onclick = async () => {
+          const ok = confirm("Delete this entry?");
+          if (!ok) return;
+
+          await fetch(`/diaryEntries/${entry.diary_id}`, { method: "DELETE" });
+
+          // If the deleted one was open, close it
+          if (selectedId === entry.diary_id) {
+            detailsCard.style.display = "none";
+            selectedId = null;
+          }
+
+          loadEntries();
+        };
+
+        tableBody.appendChild(tr);
+      });
+    }
+
+    async function openDetails(id) {
+      const res = await fetch(`/diaryEntries/${id}`);
+      const entry = await res.json();
+
+      selectedId = entry.diary_id;
+
+      detailsDiv.innerHTML = `
+        <p class="tag">${formatDate(entry.created)}</p>
+        <h3>${entry.title}</h3>
+        <p>${entry.content}</p>
+      `;
+
+      document.getElementById("editTitle").value = entry.title;
+      document.getElementById("editContent").value = entry.content;
+
+      detailsCard.style.display = "block";
+      detailsCard.scrollIntoView({ behavior: "smooth" });
+    }
+
+    // Create
+    document.getElementById("createForm").onsubmit = async e => {
+      e.preventDefault();
+
+      const payload = {
+        title: document.getElementById("title").value,
+        content: document.getElementById("content").value
+      };
+
+      const createdValue = document.getElementById("created").value;
+      if (createdValue) payload.created = createdValue;
+
+      await fetch("/diaryEntries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      e.target.reset();
+      loadEntries();
+    };
+
+    // Edit (from details section)
+    document.getElementById("editForm").onsubmit = async e => {
+      e.preventDefault();
+
+      await fetch(`/diaryEntries/${selectedId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: document.getElementById("editTitle").value,
+          content: document.getElementById("editContent").value
+        })
+      });
+
+      loadEntries();
+      openDetails(selectedId);
+    };
+
+    // Delete (from details section)
+    document.getElementById("deleteBtn").onclick = async () => {
+      if (!confirm("Delete this entry?")) return;
+
+      await fetch(`/diaryEntries/${selectedId}`, { method: "DELETE" });
+      detailsCard.style.display = "none";
+      selectedId = null;
+
+      loadEntries();
+    };
+
+    document.getElementById("closeBtn").onclick = () => {
+      detailsCard.style.display = "none";
+      selectedId = null;
+    };
+
+    // Search (ID or title)
+    document.getElementById("searchBtn").onclick = async () => {
+      const res = await fetch("/diaryEntries");
+      const data = await res.json();
+
+      const term = searchInput.value.trim().toLowerCase();
+
+      if (!term) {
+        renderEntries(data.reverse());
+        renderTable(data.reverse());
+        return;
+      }
+
+      const isNumber = !isNaN(term);
+
+      const filtered = data.filter(entry => {
+        if (isNumber) return entry.diary_id === Number(term);
+        return entry.title.toLowerCase().includes(term);
+      });
+
+      // Cards show search results
+      renderEntries(filtered.reverse());
+
+      // Table always shows ALL entries (not filtered)
+      renderTable(data.reverse());
+    };
+
+    // Clear search and show everything again
+    document.getElementById("clearBtn").onclick = () => {
+      searchInput.value = "";
+      loadEntries();
+    };
+
+    loadEntries();
+  </script>
+</body>
+</html>
