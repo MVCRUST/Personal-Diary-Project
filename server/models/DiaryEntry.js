@@ -20,6 +20,20 @@ class DiaryEntry {
         return response.rows.map((e) => new DiaryEntry(e));
     }
 
+        // Get one by date
+
+    static async getOneByDate(date) {
+        const response = await db.query(
+            "SELECT * FROM diary WHERE created >= $1::date AND created < $1::date + INTERVAL '1 day' ORDER BY created;", [date]
+        );
+        //Could get more than one response, as there are many in a date, so need to think of an error
+        if (response.rows.length == 0) {
+            throw new Error("Unable to locate diary entry for this date.");
+        }
+
+        return response.rows.map((e) => new DiaryEntry(e));
+    }
+
     // Get one entry by the id 
 
     static async getOneById(id) {
@@ -32,7 +46,7 @@ class DiaryEntry {
             throw new Error("Unable to locate diary entry.");
         }
 
-        return new DiaryEntry(response.rows[0]);
+        return response.rows.map((e) => new DiaryEntry(e));
     }
 
     // create a new entry 

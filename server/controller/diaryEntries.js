@@ -22,6 +22,18 @@ async function show(req, res) {
   }
 }
 
+// ShowDate function
+
+async function showDate(req, res) {
+    try {
+        const date = req.params.date;
+        const entry = await DiaryEntry.getOneByDate(date)
+        res.status(200).json(entry);
+    } catch (err) {
+        res.status(404).json({ error: err.message })
+    }
+}
+
 // create function 
 async function create(req, res) {
   try {
@@ -62,5 +74,5 @@ async function destroy(req, res) {
   }
 }
 
-module.exports = { index, show, create, update, destroy };
+module.exports = { index, show, create, update, destroy, showDate };
 
