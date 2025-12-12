@@ -1,4 +1,4 @@
-const database = require('../database/connect');
+const db = require('../database/connect');
 
 class DiaryEntry {
 
@@ -10,8 +10,8 @@ class DiaryEntry {
     }
 
     static async getAll() {
-        const response = await database.query(
-            "SELECT * FROM diary_entries ORDER BY created DESC;"
+        const response = await db.query(
+            "SELECT * FROM diary ORDER BY created DESC;"
         );
 
         if (response.rows.length === 0) {
@@ -20,11 +20,25 @@ class DiaryEntry {
         return response.rows.map((e) => new DiaryEntry(e));
     }
 
+        // Get one by date
+
+    static async getOneByDate(date) {
+        const response = await db.query(
+            "SELECT * FROM diary WHERE created >= $1::date AND created < $1::date + INTERVAL '1 day' ORDER BY created;", [date]
+        );
+        //Could get more than one response, as there are many in a date, so need to think of an error
+        if (response.rows.length == 0) {
+            throw new Error("Unable to locate diary entry for this date.");
+        }
+
+        return response.rows.map((e) => new DiaryEntry(e));
+    }
+
     // Get one entry by the id 
 
     static async getOneById(id) {
         const response = await db.query(
-            "SELECT * FROM diary_entries WHERE diary_id = $1;",
+            "SELECT * FROM diary WHERE diary_id = $1;",
             [id]
         );
 
@@ -32,29 +46,20 @@ class DiaryEntry {
             throw new Error("Unable to locate diary entry.");
         }
 
-        return new DiaryEntry(response.rows[0]);
+        return response.rows.map((e) => new DiaryEntry(e));
     }
 
     // create a new entry 
 
     static async create(data) {
-        const { title, content, created } = data;
+        const { title, content } = data;
 
         if (!title || !content) {
             throw new Error("Title and content are required.");
-        }
-
-        if (created) {
-            const response = await db.query(
-                `INSERT INTO diary_entries (created, title, content)
-         VALUES ($1, $2, $3)
-         RETURNING *;`,
-                [created, title, content]
-            );
-            return new DiaryEntry(response.rows[0]);
+        
         } else {
             const response = await db.query(
-                `INSERT INTO diary_entries (title, content)
+                `INSERT INTO diary (title, content)
          VALUES ($1, $2)
          RETURNING *;`,
                 [title, content]
@@ -70,7 +75,7 @@ class DiaryEntry {
         const newContent = data.content ?? this.content;
 
         const response = await db.query(
-            `UPDATE diary_entries
+            `UPDATE diary
        SET title = $1, content = $2
        WHERE diary_id = $3
        RETURNING *;`,
@@ -92,7 +97,7 @@ class DiaryEntry {
     // delete the entry 
       async destroy() {
     const response = await db.query(
-      "DELETE FROM diary_entries WHERE diary_id = $1 RETURNING *;",
+      "DELETE FROM diary WHERE diary_id = $1 RETURNING *;",
       [this.diary_id]
     );
 
